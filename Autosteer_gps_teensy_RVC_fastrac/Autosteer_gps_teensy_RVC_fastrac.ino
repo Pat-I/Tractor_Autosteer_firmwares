@@ -36,12 +36,12 @@ Reset teensyReset(A12, 2000);  //Used for Teensy reboot (short press) & reset to
 
 /************************* User Settings *************************/
 // Serial Ports
-#define SerialAOG Serial                //AgIO USB conection
-#define SerialRTK Serial3               //RTK radio
-HardwareSerial* SerialIMU = &Serial5;   //IMU BNO-085
-HardwareSerial* SerialGPS = &Serial7;   //Main postion receiver (GGA) (Serial2 must be used here with T4.0 / Basic Panda boards - Should auto swap)
-HardwareSerial* SerialGPS2 = &Serial2;  //Dual heading receiver
-HardwareSerial* SerialGPSTmp = NULL;
+#define SerialAOG Serial                     //AgIO USB conection
+#define SerialRTK Serial3                    //RTK radio
+HardwareSerialIMXRT* SerialIMU = &Serial5;   //IMU BNO-085
+HardwareSerialIMXRT* SerialGPS = &Serial7;   //Main postion receiver (GGA) (Serial2 must be used here with T4.0 / Basic Panda boards - Should auto swap)
+HardwareSerialIMXRT* SerialGPS2 = &Serial2;  //Dual heading receiver
+HardwareSerialIMXRT* SerialGPSTmp = NULL;
 //HardwareSerial* SerialAOG = &Serial;
 
 const int32_t baudAOG = 115200;
@@ -145,6 +145,13 @@ EthernetUDP Eth_udpAutoSteer;  //Port 8888
 
 IPAddress Eth_ipDestination;
 #endif  // ARDUINO_TEENSY41
+
+//communication for implement CANBUS
+uint8_t CANreceiveBuffer[16][288];
+uint8_t globalBuffer[288];
+uint8_t AOGtoCAN[288] = { 0 };  // Forces all elements to 0
+uint8_t AOGtoCANseq = 0;
+void EncodeAOGtoCAN(const uint8_t* data, uint8_t dataLen, bool isSentToAOG = true);  //to make the compiler happy, probably because of the optional argument
 
 byte CK_A = 0;
 byte CK_B = 0;
@@ -377,12 +384,15 @@ void setup() {
 
   Serial.println("Right... time for some CANBUS!");
   CAN_Setup();
+  Caninit();  //canbus for implements
   delay(100);
 }
 
 void loop() {
   ASloopTimeUs = 0;
   CANBUS_Receive();
+  CanDecode();  //Canbus from implements
+  CheckDataFromCAN();
   if (teensyReset.update()) {  // true return means reset settings to defaults
     // set to firmware defaults code goes here
 
@@ -718,9 +728,46 @@ void loop() {
       Service_Tool();
     }
   }
-
 }  //End Loop
 //**************************************************************************
+
+void CheckDataFromCAN() {
+  for (uint8_t i = 0; i < 16; i++) {
+    if (CANreceiveBuffer[i][0] == 1) {
+      CANreceiveBuffer[i][0] = 0;  //read and ready to be re-used
+
+      //format:
+      // code, loopCounter, sequence, Source, Dest, lenght, Data......., CRC (only if data > 8)
+      uint8_t dataSrc = CANreceiveBuffer[i][3];
+      uint8_t dataPGN = CANreceiveBuffer[i][4];
+      uint8_t dataLen = CANreceiveBuffer[i][5];
+      globalBuffer[0] = 0x80;
+      globalBuffer[1] = 0x81;
+      globalBuffer[2] = dataSrc;
+      globalBuffer[3] = dataPGN;
+      globalBuffer[4] = dataLen;
+
+      if (dataLen > 0) {
+        memcpy(&globalBuffer[5], &CANreceiveBuffer[i][6], dataLen);
+      }
+
+      uint8_t crc = calculateCRC(globalBuffer, 5 + dataLen);
+      globalBuffer[5 + dataLen] = crc;
+
+      //read the revelent PGNs
+      SendUdp(globalBuffer, dataLen + 6, Eth_ipDestination, portDestination);
+    }
+  }
+}
+
+// Calculate CRC for PGN message
+uint8_t calculateCRC(uint8_t* buffer, uint8_t length) {
+  uint8_t crc = 0;
+  for (int i = 2; i < length; i++) {
+    crc += buffer[i];
+  }
+  return crc;
+}
 
 bool calcChecksum() {
   CK_A = 0;

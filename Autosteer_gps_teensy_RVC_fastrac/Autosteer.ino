@@ -304,35 +304,33 @@ void autosteerLoop() {
     //read all the switches
     readingWork = digitalRead(WORKSW_PIN);  // read work switch fastrac ECU work status
 
-    if(readingWorkTwo >= 1)   readingWorkTwo--;
-    if(!digitalRead(STEERSW_PIN)) readingWorkTwo = 10;
+    if (readingWorkTwo >= 1) readingWorkTwo--;
+    if (!digitalRead(STEERSW_PIN)) readingWorkTwo = 10;
 
 
     //reading = digitalRead(STEERSW_PIN); // read the unconnected implement pin
 
 
-    if(readingWorkTwo >= 1 || readingWork == 0) workSwitch = 0;
+    if (readingWorkTwo >= 1 || readingWork == 0) workSwitch = 0;
     else workSwitch = 1;
 
-    if (steerConfig.SteerButton == 0){ //if CAN don't work
+    if (steerConfig.SteerButton == 0) {  //if CAN don't work
       // So set the correct value. When guidanceStatus = 1,
       // it should be on because the button is pressed in the GUI
       // But the guidancestatus should have set it off first
-      if (guidanceStatusChanged && guidanceStatus == 1 && steerSwitch == 1 && previous == 0)
-      {
+      if (guidanceStatusChanged && guidanceStatus == 1 && steerSwitch == 1 && previous == 0) {
         steerSwitch = 0;
         previous = 1;
       }
 
       // This will set steerswitch off and make the above check wait until the guidanceStatus has gone to 0
-      if (guidanceStatusChanged && guidanceStatus == 0 && steerSwitch == 0 && previous == 1)
-      {
+      if (guidanceStatusChanged && guidanceStatus == 0 && steerSwitch == 0 && previous == 1) {
         steerSwitch = 1;
         previous = 0;
       }
     }
 
-    
+
 
     if (steerConfig.ShaftEncoder && pulseCount >= steerConfig.PulseCountMax) {
       steerSwitch = 1;  // reset values like it turned off
@@ -434,7 +432,7 @@ void autosteerLoop() {
 
     //Ackerman fix
     if (steerAngleActual < 0) steerAngleActual = (steerAngleActual * steerSettings.AckermanFix);
-    
+
     if (watchdogTimer < WATCHDOG_THRESHOLD) {
       //Enable H Bridge for IBT2, hyd aux, etc for cytron
       if (steerConfig.CytronDriver) {
@@ -446,12 +444,12 @@ void autosteerLoop() {
       } else digitalWrite(DIR1_RL_ENABLE, 1);
 
       steerAngleError = steerAngleActual - steerAngleSetPoint;  //calculate the steering error
-      if (abs(steerAngleError*100.00) <= 2) steerAngleError = 0;
+      if (abs(steerAngleError * 100.00) <= 2) steerAngleError = 0;
       //Serial.println(steerAngleError);
       //Serial.println(steerAngleError);
       calcSteeringPID();  //do the pid
 
-      motorDrive();       //out to motors the pwm value
+      motorDrive();  //out to motors the pwm value
       // Autosteer Led goes GREEN if autosteering
 
       digitalWrite(AUTOSTEER_ACTIVE_LED, 1);
@@ -569,7 +567,7 @@ void ReceiveUdp() {
         if ((bitRead(guidanceStatus, 0) == 0) || (gpsSpeed < 0.1) || (steerSwitch == 1)) {
           watchdogTimer = WATCHDOG_FORCE_VALUE;  //turn off steering motor
           //Serial.println("nope");
-        } else                                   //valid conditions to turn on autosteer
+        } else  //valid conditions to turn on autosteer
         {
           watchdogTimer = 0;  //reset watchdog
           //Serial.println("yeah");
@@ -826,6 +824,23 @@ void ReceiveUdp() {
         }
       }
     }  //end if 80 81 7F
+
+    if (autoSteerUdpData[0] == 0x80 && autoSteerUdpData[1] == 0x81) {
+      uint16_t serialLength = autoSteerUdpData[4];
+      if (serialLength > 18) serialLength = 18;
+
+      EncodeAOGtoCAN(autoSteerUdpData, serialLength + 6);
+      //AOGtoCAN[0] = 0x80;
+      //AOGtoCAN[1] = 0x81;
+      //AOGtoCAN[2] = serialSource;
+      //AOGtoCAN[3] = serialPgn;
+      //AOGtoCAN[4] = serialLength;
+      //SerialPop.readBytes(&AOGtoCAN[5], serialLength + 1);
+      //todo: check CRC, if bad, return, if good continue
+
+      //EncodeAOGtoCAN(AOGtoCAN, serialLength + 6);
+      //memset(AOGtoCAN, 0, serialLength + 6);
+    }
   }
 }
 #endif
