@@ -1,0 +1,45 @@
+Autosteer_gps_teensy_RVC_simplyfied, dernier changement 3 mars 2024
+
+modified 20 sept 2023
+modified 26 feb 2024
+ready to be loaded in valtras
+
+pret pour plug iso travail sur A13
+
+pressure reading changé pour meilleure activation
+
+ajouté securité WAS (0.15-4.18V)
+autosteer loop a 50hz, valve a 122hz
+enlevé impression données de BNO.
+
+Autosteer_gps_teensy_RVC_fastrac, from lansalot, dernier changement 2 mars 2024
+added service tool
+read 3 first bits from message
+
+2024.03.12 both--changed watchdog timeout to 250
+2024.03.15 TROUVÉ ERREUR watchdog et mis steerangleerror*10 car int
+
+2024.05.04 change le deadband 0 PWM si erreur est plus petite ou egale à 0.02 degre
+Fastrac change pour que steer lise le reserve work avec 0.4 sec de delay pour OFF
+
+2024.05.08 Fastrac min+80, enleve le max limite pres de 0 deg
+
+2024.05.18 dans Autosteer_gps_teensy_RVC_simplyfied: nouvelle logique d'activation
+
+Teensy x:Year of Teensy,   date(firmware), file, tractor
+Teensy 1: date file
+Teensy 2: 		         2024.12.10, CANBUS matias Proto
+Teensy 3: 2022?,proto pin/t cut, 2025.01.03, CANBUS matias Proto
+Teensy null: 2024, 	         2024.05.07, Autosteer_gps_teensy_RVC_fastrac, fastrac
+Teensy 5: 2023?Etais sur 8050,   2024.05.18, Autosteer_gps_teensy_RVC_simplyfied, 8050
+Teensy 6: 2025-01, trace 5v ok,  file
+Teensy 7: 2024, 	         2024.04.11, Autosteer_gps_teensy_RVC_simplyfied, 8550
+Teensy x: date file
+Teensy x: date file
+
+
+F9P:
+8050: nouv mars 2024?
+8550: ancien du 8050?
+JCB: Celui du garage, jamais utilisé, instalé mars 2024
+
