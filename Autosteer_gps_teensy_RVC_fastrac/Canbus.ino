@@ -47,7 +47,7 @@ void CanDecode() {
       uint8_t idSrc = (id >> 8) & 0xFF;
       uint8_t idDest = id & 0xFF;
 
-      if (idflag == 1 || idflag == 5) {     //standard sentence
+      if (idflag == 1) {     //standard sentence (idflag == 1 || idflag == 5) //read only 1 -> intended for AOG
         CANreceiveBuffer[arrayNbr][0] = 1;  //this mean there's a sentence to read, must be set to 0 once read
         CANreceiveBuffer[arrayNbr][1] = 0;  //loop counter
         CANreceiveBuffer[arrayNbr][2] = 0;  //sequence counter, not used for single sentences
@@ -56,7 +56,7 @@ void CanDecode() {
         CANreceiveBuffer[arrayNbr][5] = 8;  //data length
 
         memcpy(&CANreceiveBuffer[arrayNbr][6], RCV.buf, 8);
-      } else if (idflag == 2 || idflag == 6) {
+      } else if (idflag == 2) { //read only 2, not 6 -> intended for AOG
         CANreceiveBuffer[arrayNbr][0] = 1;  //this mean there's a sentence to read, must be set to 0 once read
         CANreceiveBuffer[arrayNbr][1] = 0;  //loop counter
         CANreceiveBuffer[arrayNbr][2] = 0;  //sequence counter, not used for single sentences
@@ -64,7 +64,7 @@ void CanDecode() {
         CANreceiveBuffer[arrayNbr][4] = idDest;
 
         memcpy(&CANreceiveBuffer[arrayNbr][5], RCV.buf, 8);
-      } else if (idflag == 0 || idflag == 4) {  //flag is 0, extended AOG PGN over multiple CAN sentences
+      } else if (idflag == 0) {  //flag is 0, extended AOG PGN over multiple CAN sentences //read only 0, not 4 -> intended for AOG
 
         //more that 8 bytes payload
         //buf[0] message number of the serie
