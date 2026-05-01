@@ -258,6 +258,17 @@ struct ubxPacket {
   ////sfe_ublox_packet_validity_e classAndIDmatch; // Goes from NOT_DEFINED to VALID or NOT_VALID when the Class and ID match the requestedClass and requestedID
 };
 
+// TM171 stuff
+//roll moyenne flottante
+#include "RunningAverage.h"
+RunningAverage myRA(7);
+int samples = 0;
+float avg = 0;
+elapsedMillis TM171lastData;
+elapsedMillis imuTimer;
+bool imuTrigger = false;
+bool useTM171 = false;
+
 // Setup procedure ------------------------
 void setup() {
   delay(200);  //Small delay so serial can monitor start up
@@ -364,6 +375,17 @@ void setup() {
       */
   }
 
+  TM171setup();
+  delay(200);
+  TM171process();
+  if (TM171lastData <= 80) {
+    Serial.println("Received data from TM171");
+    useTM171 = true;
+    imuHandler();
+  } else {
+    Serial.println("No fresh data from TM171");
+  }
+
   //delay(100);
   Serial.print("\r\nuseBNO08xRVC = ");
   Serial.println(useBNO08xRVC);
@@ -422,6 +444,13 @@ void loop() {
       PortSwapTime = systick_millis_count;
     }
   }
+
+  TM171process();
+	if (useTM171 && imuTimer > 70 && imuTrigger)
+	{
+		imuTrigger = false;
+		imuHandler();
+	}
 
   if (!useCMPS && !useBNO08x) {
     //RVC BNO08x
