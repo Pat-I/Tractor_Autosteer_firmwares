@@ -38,7 +38,7 @@ Reset teensyReset(A12, 2000);  //Used for Teensy reboot (short press) & reset to
 // Serial Ports
 #define SerialAOG Serial                     //AgIO USB conection
 #define SerialRTK Serial3                    //RTK radio
-HardwareSerialIMXRT* SerialIMU = &Serial5;   //IMU BNO-085
+HardwareSerialIMXRT* SerialImu = &Serial5;   //IMU BNO-085
 HardwareSerialIMXRT* SerialGPS = &Serial7;   //Main postion receiver (GGA) (Serial2 must be used here with T4.0 / Basic Panda boards - Should auto swap)
 HardwareSerialIMXRT* SerialGPS2 = &Serial2;  //Dual heading receiver
 HardwareSerialIMXRT* SerialGPSTmp = NULL;
@@ -328,8 +328,8 @@ void setup() {
 
   //check for RVC/Serial BNO first
   pinMode(A4, INPUT);  // set SDA to high impedance
-  SerialIMU->begin(115200);
-  rvc.begin(SerialIMU);
+  SerialImu->begin(115200);
+  rvc.begin(SerialImu);
   static elapsedMillis rvcBnoTimer = 0;
 
   Serial.println("Checking for RVC/Serial BNO08x");

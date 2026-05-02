@@ -71,9 +71,6 @@ void GGA_Handler()  //Rec'd GGA
   bnoTrigger = true;
 
   if (useTM171) {
-    imuTrigger = true;
-    imuTimer = 0;
-    BuildNmea();
     if (qos >= 2) {
 
       if (badQOStimer > 15000)  // If ethernet running send the GPS there
@@ -120,8 +117,10 @@ void GGA_Handler()  //Rec'd GGA
     dualReadyGGA = true;
   }
 
-  if (useBNO08x || useCMPS || useBNO08xRVC) {
+  if (useBNO08x || useCMPS || useBNO08xRVC || useTM171) {
     //if(!useBNO08xRVC) imuHandler();  //Get IMU data ready (i2c BNO & CMPS only. RVC BNO done via timmed loop)
+    imuTrigger = true; /// for tm171
+    imuTimer = 0; //for tm171
     BuildNmea();           //Build & send data GPS data to AgIO (Both Dual & Single)
     dualReadyGGA = false;  //Force dual GGA ready false because we just sent it to AgIO based off the IMU data
     if (!useDual) {
