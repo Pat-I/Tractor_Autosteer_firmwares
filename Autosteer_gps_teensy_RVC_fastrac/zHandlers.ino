@@ -224,7 +224,6 @@ void readBNO()
 void imuHandler() {
   //int16_t temp = 0;
 
-
   if (useTM171) {
     float angVel;
 

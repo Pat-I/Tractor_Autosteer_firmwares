@@ -28,7 +28,7 @@
 // CFG-UART2-BAUDRATE 460800
 // Serial 2 In RTCM
 
-String inoVersion = ("\r\nFirmware Version !! RVC & A0!! for fastrac 8310, 2024.05.08 - Pat\r\n");
+String inoVersion = ("\r\nFirmware Version !! TM171 & A0!! for fastrac 8310, 2026.05.03 - Pat\r\n");
 #include "CANBUS.h"
 #include "reset.h"
 //Reset(uint8_t _btnIO, uint16_t _btnPressPeriod = 10000, uint8_t _ledIO = LED_BUILTIN)
@@ -273,7 +273,7 @@ bool useTM171 = false;
 void setup() {
   delay(200);  //Small delay so serial can monitor start up
   //set_arm_clock(150000000);
-  //Serial.begin(115200);
+  Serial.begin(115200);
   delay(100);  //Set CPU speed to 150mhz
   Serial.print("CPU speed set to: ");
   Serial.println(F_CPU_ACTUAL);
@@ -313,17 +313,17 @@ void setup() {
 
   delay(10);
 
-  Serial.println("\r\nStarting AutoSteer...");
+  Serial.println("Starting AutoSteer...");
   autosteerSetup();
 
   delay(10);
 
-  Serial.println("\r\nStarting Ethernet...");
+  Serial.println("Starting Ethernet...");
   EthernetStart();
 
   delay(10);
 
-  Serial.println("\r\nStarting IMU...");
+  Serial.println("Starting IMU...");
   bool reboot = false;  // for testing, used to reboot until no BNO is detected, can be removed
 
   //check for RVC/Serial BNO first
