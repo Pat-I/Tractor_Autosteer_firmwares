@@ -18,15 +18,15 @@ char geoid[12];
 char ageDGPS[10];
 
 // VTG
-char vtgHeading[12] = { };
-char speedKnots[10] = { };
+char vtgHeading[12] = {};
+char speedKnots[10] = {};
 
 //HPR
 bool useHPR = false;
 bool dualReadyHPR = false;
-float  hprHeading = 0;
+float hprHeading = 0;
 float hprRoll = 0;
-char hprSolQuality[12] = { };
+char hprSolQuality[12] = {};
 
 // IMU
 char imuHeading[6];
@@ -34,13 +34,14 @@ char imuRoll[6];
 char imuPitch[6];
 char imuYawRate[6];
 
+elapsedMillis badQOStimer;
+
 // If odd characters showed up.
-void errorHandler()
-{
+void errorHandler() {
 	//nothing at the moment
 }
 
-void GGA_Handler() //Rec'd GGA
+void GGA_Handler()  //Rec'd GGA
 {
 	// fix time
 	parser.getArg(0, fixTime);
@@ -91,44 +92,39 @@ void GGA_Handler() //Rec'd GGA
 	tempString = ageDGPS;
 	rtkAgeGGA = tempString.toFloat();
 
-	bnoTimer = 0;
-	bnoTrigger = true;
-
-	if (useDual)
-	{
-		if (dualReadyHPR)
-		{
+	if (useDual) {
+		if (dualReadyHPR) {
 			BuildNmea();
 			dualReadyHPR = false;
-		}
-		else if (dualReadyRelPos)
-		{
+		} else if (dualReadyRelPos) {
 			BuildNmea();
 			dualReadyRelPos = false;
-		}
-		else
-		{
+		} else {
 			dualReadyGGA = true;
 		}
+	} else if (useTM171) {
+		imuTrigger = true;  /// for tm171
+		imuTimer = 0;       //for tm171
+		BuildNmea();
+		if (qos >= 2) {
+
+			if (badQOStimer > 15000)  // If ethernet running send the GPS there
+			{
+				badQOStimer = 0;
+
+				String message = "IMU (TM171) not ready! Temp: " + String(TemperatureV.fValue) + "C  QoS: " + String(qos);
+				Serial.println(message);
+
+				sendHardwareMessage(message, 5, 0);
+			}
+		}
 	}
 
-	else if (useBNO08x)
-	{
-		//imuHandler();          //Get IMU data ready
-		BuildNmea();           //Build & send data GPS data to AgIO
-	}
-
-	else if (useBNO08xRVC)
-	{
-		BuildNmea();           //Build & send data GPS data to AgIO
-	}
-
-	else
-	{
+	else {
 		itoa(0, imuYawRate, 10);
 		itoa(0, imuRoll, 10);
 		itoa(0, imuPitch, 10);
-		itoa(65535, imuHeading, 10);       //65535 is max value to stop AgOpen using IMU in Panda
+		itoa(65535, imuHeading, 10);  //65535 is max value to stop AgOpen using IMU in Panda
 		BuildNmea();
 	}
 	/*
@@ -143,19 +139,17 @@ void GGA_Handler() //Rec'd GGA
 
 	static int GPS_1hz = 0;
 
-	
-	if (GPS_1hz > 9)
-	{
+
+	if (GPS_1hz > 9) {
 		GPS_1hz = 0;
-		if(sendGPStoISOBUS_129029) sendISOBUS_129029();
-		if(sendGPStoISOBUS_65254) sendISOBUS_65254();
+		if (sendGPStoISOBUS_129029) sendISOBUS_129029();
+		if (sendGPStoISOBUS_65254) sendISOBUS_65254();
 	}
 
 	GPS_1hz++;
 }
 
-void VTG_Handler()
-{
+void VTG_Handler() {
 	//$GNVTG,123.119,T,130.046,M,0.00444,N,0.00822,K,A*38
 	//      ,heading,T,headMag,M, knots ,N, kPH   ,K,mode *
 	// vtg heading
@@ -163,15 +157,13 @@ void VTG_Handler()
 
 	// vtg Speed knots
 	parser.getArg(4, speedKnots);
-
 }
 
-void HPR_Handler()
-{
+void HPR_Handler() {
 	//$GNHPR,074615.00,320.9610,-66.1712,000.0000,4,47,0.00,0999*45
 	//      , time    , heading, pitch  , roll,qual,sat,age,stn *checksum
 
-	char tempHPR[10] = { };
+	char tempHPR[10] = {};
 	parser.getArg(1, tempHPR);
 	hprHeading = atof(tempHPR);
 
@@ -180,121 +172,58 @@ void HPR_Handler()
 
 	parser.getArg(3, hprSolQuality);
 
-		useHPR = true;
-		useDual = true;
+	useHPR = true;
+	useDual = true;
 
-		if (dualReadyGGA)
-        {
-            BuildNmea();
-            dualReadyGGA = false;
-        }
-        else
-        {
-            dualReadyHPR = true;   //HPR ready is true so PAOGI will send when the GGA is also ready
-        }
+	if (dualReadyGGA) {
+		BuildNmea();
+		dualReadyGGA = false;
+	} else {
+		dualReadyHPR = true;  //HPR ready is true so PAOGI will send when the GGA is also ready
+	}
 }
 
-void ZDA_Handler()
-{
-
+void ZDA_Handler() {
 }
 
-bool imuHandler()
-{
-	int16_t temp = 0;
+bool imuHandler() {
+	if (useTM171) {
+		float angVel;
 
-	if (useBNO08x)
-	{
-		//BNO is reading in its own timer    
 		// Fill rest of Panda Sentence - Heading
-		temp = yaw;
-		itoa(temp, imuHeading, 10);
+		itoa(YawV.fValue * 10, imuHeading, 10);
 
-		// the pitch x10
-		temp = (int16_t)pitch;
-		itoa(temp, imuPitch, 10);
+		if (steerConfig.IsUseY_Axis) {
+			// the pitch x100
+			itoa(PitchV.fValue * 10, imuPitch, 10);
 
-		// the roll x10
-		temp = (int16_t)roll;
-		itoa(temp, imuRoll, 10);
+			// the roll x100
+			itoa(RollV.fValue * 10, imuRoll, 10);
+		} else {
+			// the pitch x100
+			itoa(RollV.fValue * 10, imuPitch, 10);
 
-		// YawRate - 0 for now
-		itoa(0, imuYawRate, 10);
-
-		return true;
-	}
-
-	else if (useBNO08xRVC)
-	{
-		if (!bnoData.yawX10 == 0) {//BNO data ok?
-			float angVel;
-
-			// Fill rest of Panda Sentence - Heading
-			itoa(bnoData.yawX10, imuHeading, 10);
-
-			if (steerConfig.IsUseY_Axis)
-			{
-				// the pitch x100
-				itoa(bnoData.pitchX10, imuPitch, 10);
-
-				// the roll x100
-				itoa(bnoData.rollX10, imuRoll, 10);
-			}
-			else
-			{
-				// the pitch x100
-				itoa(bnoData.rollX10, imuPitch, 10);
-
-				// the roll x100
-				itoa(bnoData.pitchX10, imuRoll, 10);
-			}
-
-			//Serial.print(rvc.angCounter);
-			//Serial.print(", ");
-			//Serial.print(bnoData.angVel);
-			//Serial.print(", ");
-			// YawRate
-			if (rvc.angCounter > 0)
-			{
-				angVel = ((float)bnoData.angVel) / (float)rvc.angCounter;
-				angVel *= 10.0;
-				rvc.angCounter = 0;
-				bnoData.angVel = (int16_t)angVel;
-			}
-			else
-			{
-				bnoData.angVel = 0;
-			}
-
-			itoa(bnoData.angVel, imuYawRate, 10);
-			bnoData.angVel = 0;
-
-			return true;
+			// the roll x100
+			itoa(PitchV.fValue * 10, imuRoll, 10);
 		}
-		else return false;//BNO data is corrupt, so do nothing = use old one
-	}
-	else return false;//BNO data is corrupt, so do nothing = use old one
+		itoa(0, imuYawRate, 10);
+		return true;
+	} else return false;  //BNO data is corrupt, so do nothing = use old one
 }
 
-void BuildNmea(void)
-{
+void BuildNmea(void) {
 	strcpy(nmea, "");
 
-	if (useDual)
-	{
+	if (useDual) {
 		strcat(nmea, "$PAOGI,");
-		if(useHPR)
-		{
+		if (useHPR) {
 			dtostrf(hprRoll, 4, 2, imuRoll);
 			dtostrf(hprHeading, 4, 2, imuHeading);
-		}
-		else
-		{
+		} else {
 			dtostrf(rollDual, 4, 2, imuRoll);
 			dtostrf(heading, 4, 2, imuHeading);
 		}
-	}
-	else strcat(nmea, "$PANDA,");
+	} else strcat(nmea, "$PANDA,");
 
 	strcat(nmea, fixTime);
 	strcat(nmea, ",");
@@ -359,27 +288,23 @@ void BuildNmea(void)
 	Udp.beginPacket(ipDestination, 9999);
 	Udp.write(nmea, len);
 	Udp.endPacket();
-
 }
 
-void CalculateChecksum(void)
-{
+void CalculateChecksum(void) {
 	int16_t sum = 0;
 	int16_t inx = 0;
 	char tmp;
 
 	// The checksum calc starts after '$' and ends before '*'
-	for (inx = 1; inx < 200; inx++)
-	{
+	for (inx = 1; inx < 200; inx++) {
 		tmp = nmea[inx];
 
 		// * Indicates end of data and start of checksum
-		if (tmp == '*')
-		{
+		if (tmp == '*') {
 			break;
 		}
 
-		sum ^= tmp;    // Build checksum
+		sum ^= tmp;  // Build checksum
 	}
 
 	byte chk = (sum >> 4);

@@ -114,7 +114,6 @@ bool WASDebug = false;
 #include <Wire.h>
 #include <EEPROM.h> 
 #include "zNMEAParser.h"
-#include "BNO08x_AOG.h"
 #include "LEDS.h"
 LEDS LEDs = LEDS(1000, 255, 64, 127); // 1000ms RGB update, 255/64/127 RGB brightness balance levels for v5.0a
 
@@ -252,23 +251,19 @@ uint8_t N2K_129029_Data[48];
 
 //Swap BNO08x roll & pitch? - Note this is now sent from AgOpen
 
-//Roomba Vac mode for BNO085 and data
-#include "BNO_RVC.h"
-BNO_rvc rvc = BNO_rvc();
-BNO_rvcData bnoData;
-elapsedMillis bnoTimer;
-bool bnoTrigger = false;
-HardwareSerial* SerialIMU = &Serial6;// &Serial5;   //IMU BNO-085
 
-// booleans to see what mode BNO08x
-bool useBNO08x = false;
-bool useBNO08xRVC = true;// false;
+HardwareSerialIMXRT* SerialImu = &Serial4;// &Serial5;   //IMU BNO-085
 
-// BNO08x address variables to check where it is
-const uint8_t bno08xAddresses[] = { 0x4A,0x4B };
-const int16_t nrBNO08xAdresses = sizeof(bno08xAddresses) / sizeof(bno08xAddresses[0]);
-uint8_t bno08xAddress;
-BNO080 bno08x;
+// TM171 stuff
+//roll moyenne flottante
+#include "RunningAverage.h"
+RunningAverage myRA(7);
+int samples = 0;
+float avg = 0;
+elapsedMillis TM171lastData;
+elapsedMillis imuTimer;
+bool imuTrigger = false;
+bool useTM171 = false;
 
 const uint16_t WATCHDOG_THRESHOLD = 100;
 const uint16_t WATCHDOG_FORCE_VALUE = WATCHDOG_THRESHOLD + 2; // Should be greater than WATCHDOG_THRESHOLD
@@ -416,28 +411,7 @@ void setup()
 	  ; // wait for serial port to connect. Needed for native USB port only
 	}*/
 
-	SerialIMU->begin(115200);
-	rvc.begin(SerialIMU);
-
-	// DONT Check for i2c BNO08x
-
-	if (!useBNO08x)
-	{
-		static elapsedMillis rvcBnoTimer = 0;
-		Serial.println("\r\nChecking for serial BNO08x");
-		while (rvcBnoTimer < 1000)
-		{
-			//check if new bnoData
-			if (rvc.read(&bnoData))
-			{
-				useBNO08xRVC = true;
-				Serial.println("Serial BNO08x Good To Go :-)");
-				imuHandler();
-				break;
-			}
-		}
-		if (!useBNO08xRVC)  Serial.println("No Serial BNO08x not Connected or Found");
-	}
+	SerialImu->begin(115200);
 
 #ifdef isAllInOneBoard
 	SerialESP32.begin(baudESP32);
@@ -527,6 +501,17 @@ void setup()
 	LEDs.set(LED_ID::STEER, STEER_STATE::AUTOSTEER_READY);
 	//pinMode(AUTOSTEER_STANDBY_LED, LOW);
 	//pinMode(AUTOSTEER_ACTIVE_LED, LOW);
+
+	TM171setup();
+  delay(200);
+  TM171process();
+  if (TM171lastData <= 80) {
+    Serial.println("Received data from TM171");
+    useTM171 = true;
+    imuHandler();
+  } else {
+    Serial.println("No fresh data from TM171");
+  }
 
 
 	Serial.println("\r\nStarting CAN-Bus Ports");
@@ -842,20 +827,11 @@ void loop()
 	//--CAN--End-----
 
 	//**GPS**
-	if (useBNO08x)
+	TM171process();
+	if (useTM171 && imuTimer > 70 && imuTrigger)
 	{
-		Read_IMU();
-	}
-	else
-	{
-		//RVC BNO08x
-		if (rvc.read(&bnoData)) useBNO08xRVC = true;
-	}
-
-	if (useBNO08xRVC && bnoTimer > 70 && bnoTrigger)
-	{
-
-		if (imuHandler())  bnoTrigger = false;  //Get IMU data ready
+		imuTrigger = false;
+		imuHandler();
 	}
 
 	if (gpsMode == 1 || gpsMode == 2)
@@ -1066,7 +1042,7 @@ void udpSteerRecv(int sizeToRead)
 			Udp.write(helloFromAutoSteer, sizeof(helloFromAutoSteer));
 			Udp.endPacket();
 
-			if (useBNO08x || useBNO08xRVC)
+			if (useTM171)
 			{
 				Udp.beginPacket(ipDestination, 9999);
 				Udp.write(helloFromIMU, sizeof(helloFromIMU));

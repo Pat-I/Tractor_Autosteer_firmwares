@@ -1,14 +1,14 @@
 
 #define GPS Serial5//Serial7
-#define GPS_Dual Serial2
+#define GPS_Dual Serial8
 #define GPS_RTK Serial3
 #define RTK_Baud 115200
 
 char rxbuffer[512];         //Extra serial rx buffer
-char txbuffer[1023];        //Extra serial tx buffer
+char txbuffer[1024];        //Extra serial tx buffer
 
 char rxbuffer_GPS_Dual[512];   //Extra serial rx buffer
-char rxbuffer_RTK[1023];       //Extra serial rx buffer
+char rxbuffer_RTK[1024];       //Extra serial rx buffer
 
 char nmeaBuffer[200];
 int count=0;
@@ -47,74 +47,6 @@ void GPS_setup()
 
 
 }
-
-//**************************************************************
-
-void Read_IMU()
-{
-  //Gyro Timmed loop
-  IMU_currentTime = millis();
-
-  if ((IMU_currentTime - lastGyroTime) >= GYRO_LOOP_TIME)
-    {
-      lastGyroTime = IMU_currentTime;
-      
-      if(useBNO08x)
-      {
-        if (bno08x.dataAvailable() == true)
-        {
-            float dqx, dqy, dqz, dqw, dacr;
-            uint8_t dac;
-
-            //get quaternion
-            bno08x.getQuat(dqx, dqy, dqz, dqw, dacr, dac);
-
-            float norm = sqrt(dqw * dqw + dqx * dqx + dqy * dqy + dqz * dqz);
-            dqw = dqw / norm;
-            dqx = dqx / norm;
-            dqy = dqy / norm;
-            dqz = dqz / norm;
-
-            float ysqr = dqy * dqy;
-
-            // yaw (z-axis rotation)
-            float t3 = +2.0 * (dqw * dqz + dqx * dqy);
-            float t4 = +1.0 - 2.0 * (ysqr + dqz * dqz);
-            yaw = atan2(t3, t4);
-
-            // Convert yaw to degrees x10
-            yaw = (int16_t)((yaw * -RAD_TO_DEG_X_10));
-            if (yaw < 0) yaw += 3600;
-
-            // pitch (y-axis rotation)
-            float t2 = +2.0 * (dqw * dqy - dqz * dqx);
-            t2 = t2 > 1.0 ? 1.0 : t2;
-            t2 = t2 < -1.0 ? -1.0 : t2;
-            //            pitch = asin(t2) * RAD_TO_DEG_X_10;
-
-                        // roll (x-axis rotation)
-            float t0 = +2.0 * (dqw * dqx + dqy * dqz);
-            float t1 = +1.0 - 2.0 * (dqx * dqx + ysqr);
-            //            roll = atan2(t0, t1) * RAD_TO_DEG_X_10;
-
-            if (steerConfig.IsUseY_Axis)
-            {
-                roll = asin(t2) * RAD_TO_DEG_X_10;
-                pitch = atan2(t0, t1) * RAD_TO_DEG_X_10;
-            }
-            else
-            {
-                pitch = asin(t2) * RAD_TO_DEG_X_10;
-                roll = atan2(t0, t1) * RAD_TO_DEG_X_10;
-            }
-        }
-      }     
-    }
-  //-----End Gyro Timed Loop-----
-
-}
-
-//**************************************************************
 
 void Panda_GPS()
 {
